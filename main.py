@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from ai_client import AIOutfitClient
+from ai_client import GeminiOutfitClient
 from config import ConfigurationError, load_config
 from outfit_planner import OutfitPlanner, OutfitPlannerError, save_suggestion_history
 from weather_api import WeatherApiClient
@@ -36,7 +36,7 @@ def main() -> int:
             units=config.weather_units,
             timeout_seconds=config.request_timeout_seconds,
         ),
-        AIOutfitClient(config.openai_api_key, model=config.openai_model),
+        GeminiOutfitClient(config.gemini_api_key, model=config.gemini_model),
     )
 
     try:

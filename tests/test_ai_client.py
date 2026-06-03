@@ -1,48 +1,33 @@
 import unittest
 
-from ai_client import AIClientError, AIOutfitClient
+from ai_client import AIClientError, GeminiOutfitClient
 from weather_api import WeatherData
 
 
-class FakeMessage:
+class FakeGeminiResponse:
     def __init__(self, content):
-        self.content = content
+        self.text = content
 
 
-class FakeChoice:
-    def __init__(self, content):
-        self.message = FakeMessage(content)
-
-
-class FakeResponse:
-    def __init__(self, content):
-        self.choices = [FakeChoice(content)]
-
-
-class FakeCompletions:
+class FakeModels:
     def __init__(self, content="Wear a coat.", exception=None):
         self.content = content
         self.exception = exception
         self.last_kwargs = None
 
-    def create(self, **kwargs):
+    def generate_content(self, **kwargs):
         self.last_kwargs = kwargs
         if self.exception:
             raise self.exception
-        return FakeResponse(self.content)
+        return FakeGeminiResponse(self.content)
 
 
-class FakeChat:
-    def __init__(self, completions):
-        self.completions = completions
+class FakeGeminiClient:
+    def __init__(self, models):
+        self.models = models
 
 
-class FakeOpenAIClient:
-    def __init__(self, completions):
-        self.chat = FakeChat(completions)
-
-
-class AIOutfitClientTests(unittest.TestCase):
+class GeminiOutfitClientTests(unittest.TestCase):
     def setUp(self):
         self.weather = WeatherData(
             city="Zurich",
@@ -56,33 +41,49 @@ class AIOutfitClientTests(unittest.TestCase):
         )
 
     def test_build_prompt_contains_weather_details(self):
-        prompt = AIOutfitClient.build_prompt(self.weather)
+        prompt = GeminiOutfitClient.build_prompt(self.weather)
 
         self.assertIn("Zurich, CH", prompt)
         self.assertIn("8C", prompt)
         self.assertIn("shoes", prompt)
 
-    def test_generate_recommendation_calls_chat_completion(self):
-        completions = FakeCompletions("Wear a warm jacket and waterproof shoes.")
-        client = AIOutfitClient("openai-key", model="test-model", client=FakeOpenAIClient(completions))
+    def test_generate_recommendation_calls_gemini_content_generation(self):
+        models = FakeModels("Wear a warm jacket and waterproof shoes.")
+        client = GeminiOutfitClient(
+            "gemini-key",
+            model="test-model",
+            client=FakeGeminiClient(models),
+            generation_config_factory=lambda instruction: {"system_instruction": instruction, "temperature": 0.7},
+        )
 
         recommendation = client.generate_recommendation(self.weather)
 
         self.assertEqual(recommendation, "Wear a warm jacket and waterproof shoes.")
-        self.assertEqual(completions.last_kwargs["model"], "test-model")
-        self.assertEqual(completions.last_kwargs["messages"][0]["role"], "system")
-        self.assertIn("Zurich", completions.last_kwargs["messages"][1]["content"])
+        self.assertEqual(models.last_kwargs["model"], "test-model")
+        self.assertIn("Zurich", models.last_kwargs["contents"])
+        self.assertEqual(
+            models.last_kwargs["config"]["system_instruction"],
+            GeminiOutfitClient.SYSTEM_INSTRUCTION,
+        )
 
     def test_generate_recommendation_wraps_client_errors(self):
-        completions = FakeCompletions(exception=RuntimeError("api down"))
-        client = AIOutfitClient("openai-key", client=FakeOpenAIClient(completions))
+        models = FakeModels(exception=RuntimeError("api down"))
+        client = GeminiOutfitClient(
+            "gemini-key",
+            client=FakeGeminiClient(models),
+            generation_config_factory=lambda instruction: {"system_instruction": instruction},
+        )
 
         with self.assertRaises(AIClientError):
             client.generate_recommendation(self.weather)
 
     def test_generate_recommendation_rejects_empty_text(self):
-        completions = FakeCompletions("   ")
-        client = AIOutfitClient("openai-key", client=FakeOpenAIClient(completions))
+        models = FakeModels("   ")
+        client = GeminiOutfitClient(
+            "gemini-key",
+            client=FakeGeminiClient(models),
+            generation_config_factory=lambda instruction: {"system_instruction": instruction},
+        )
 
         with self.assertRaises(AIClientError):
             client.generate_recommendation(self.weather)

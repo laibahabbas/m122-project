@@ -21,8 +21,8 @@ class AppConfig:
     """Runtime settings loaded from environment variables."""
 
     openweathermap_api_key: str
-    openai_api_key: str
-    openai_model: str = "gpt-4.1-mini"
+    gemini_api_key: str
+    gemini_model: str = "gemini-3.5-flash"
     weather_units: str = "metric"
     request_timeout_seconds: int = 10
     history_file: Path = Path("recommendation_history.txt")
@@ -36,12 +36,12 @@ def load_config() -> AppConfig:
         load_dotenv()
 
     openweathermap_api_key = _required_env("OPENWEATHERMAP_API_KEY")
-    openai_api_key = _required_env("OPENAI_API_KEY")
+    gemini_api_key = _required_env("GEMINI_API_KEY")
 
     return AppConfig(
         openweathermap_api_key=openweathermap_api_key,
-        openai_api_key=openai_api_key,
-        openai_model=os.getenv("OPENAI_MODEL", AppConfig.openai_model).strip(),
+        gemini_api_key=gemini_api_key,
+        gemini_model=os.getenv("GEMINI_MODEL", AppConfig.gemini_model).strip(),
         weather_units=os.getenv("WEATHER_UNITS", AppConfig.weather_units).strip(),
         request_timeout_seconds=_positive_int_env(
             "REQUEST_TIMEOUT_SECONDS",

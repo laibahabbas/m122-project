@@ -9,8 +9,8 @@ class ConfigTests(unittest.TestCase):
     def test_load_config_reads_required_api_keys(self):
         env = {
             "OPENWEATHERMAP_API_KEY": "weather-key",
-            "OPENAI_API_KEY": "openai-key",
-            "OPENAI_MODEL": "test-model",
+            "GEMINI_API_KEY": "gemini-key",
+            "GEMINI_MODEL": "test-model",
             "REQUEST_TIMEOUT_SECONDS": "15",
         }
 
@@ -18,12 +18,12 @@ class ConfigTests(unittest.TestCase):
             config = load_config()
 
         self.assertEqual(config.openweathermap_api_key, "weather-key")
-        self.assertEqual(config.openai_api_key, "openai-key")
-        self.assertEqual(config.openai_model, "test-model")
+        self.assertEqual(config.gemini_api_key, "gemini-key")
+        self.assertEqual(config.gemini_model, "test-model")
         self.assertEqual(config.request_timeout_seconds, 15)
 
     def test_load_config_fails_when_required_key_is_missing(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=True):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "gemini-key"}, clear=True):
             with self.assertRaises(ConfigurationError) as context:
                 load_config()
 
@@ -32,7 +32,7 @@ class ConfigTests(unittest.TestCase):
     def test_load_config_rejects_invalid_timeout(self):
         env = {
             "OPENWEATHERMAP_API_KEY": "weather-key",
-            "OPENAI_API_KEY": "openai-key",
+            "GEMINI_API_KEY": "gemini-key",
             "REQUEST_TIMEOUT_SECONDS": "zero",
         }
 
