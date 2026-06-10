@@ -11,21 +11,23 @@ class ConfigTests(unittest.TestCase):
             "OPENWEATHERMAP_API_KEY": "weather-key",
             "GEMINI_API_KEY": "gemini-key",
             "GEMINI_MODEL": "test-model",
+            "GEMINI_FALLBACK_MODELS": "fallback-one, fallback-two",
             "REQUEST_TIMEOUT_SECONDS": "15",
         }
 
         with patch.dict(os.environ, env, clear=True):
-            config = load_config()
+            config = load_config(load_env_file=False)
 
         self.assertEqual(config.openweathermap_api_key, "weather-key")
         self.assertEqual(config.gemini_api_key, "gemini-key")
         self.assertEqual(config.gemini_model, "test-model")
+        self.assertEqual(config.gemini_fallback_models, ("fallback-one", "fallback-two"))
         self.assertEqual(config.request_timeout_seconds, 15)
 
     def test_load_config_fails_when_required_key_is_missing(self):
         with patch.dict(os.environ, {"GEMINI_API_KEY": "gemini-key"}, clear=True):
             with self.assertRaises(ConfigurationError) as context:
-                load_config()
+                load_config(load_env_file=False)
 
         self.assertIn("OPENWEATHERMAP_API_KEY", str(context.exception))
 
@@ -38,7 +40,7 @@ class ConfigTests(unittest.TestCase):
 
         with patch.dict(os.environ, env, clear=True):
             with self.assertRaises(ConfigurationError):
-                load_config()
+                load_config(load_env_file=False)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Tuple
 
 try:
     from dotenv import load_dotenv
@@ -22,17 +23,18 @@ class AppConfig:
 
     openweathermap_api_key: str
     gemini_api_key: str
-    gemini_model: str = "gemini-3.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_fallback_models: Tuple[str, ...] = ("gemini-2.5-flash-lite",)
     weather_units: str = "metric"
     request_timeout_seconds: int = 10
     history_file: Path = Path("recommendation_history.txt")
     log_file: Path = Path("app.log")
 
 
-def load_config() -> AppConfig:
+def load_config(*, load_env_file: bool = True) -> AppConfig:
     """Load and validate required configuration from environment variables."""
 
-    if load_dotenv is not None:
+    if load_env_file and load_dotenv is not None:
         load_dotenv()
 
     openweathermap_api_key = _required_env("OPENWEATHERMAP_API_KEY")
@@ -42,6 +44,10 @@ def load_config() -> AppConfig:
         openweathermap_api_key=openweathermap_api_key,
         gemini_api_key=gemini_api_key,
         gemini_model=os.getenv("GEMINI_MODEL", AppConfig.gemini_model).strip(),
+        gemini_fallback_models=_csv_env(
+            "GEMINI_FALLBACK_MODELS",
+            AppConfig.gemini_fallback_models,
+        ),
         weather_units=os.getenv("WEATHER_UNITS", AppConfig.weather_units).strip(),
         request_timeout_seconds=_positive_int_env(
             "REQUEST_TIMEOUT_SECONDS",
@@ -72,3 +78,10 @@ def _positive_int_env(name: str, default: int) -> int:
     if value <= 0:
         raise ConfigurationError(f"{name} must be a positive integer")
     return value
+
+
+def _csv_env(name: str, default: Tuple[str, ...]) -> Tuple[str, ...]:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value.strip() == "":
+        return default
+    return tuple(value.strip() for value in raw_value.split(",") if value.strip())

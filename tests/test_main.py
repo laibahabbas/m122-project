@@ -14,6 +14,14 @@ class MainTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         stderr.write.assert_called()
 
+    def test_main_returns_error_when_city_input_is_unavailable(self):
+        with patch("main.input", side_effect=EOFError):
+            with patch("sys.stderr") as stderr:
+                exit_code = main.main()
+
+        self.assertEqual(exit_code, 1)
+        stderr.write.assert_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
 
 from weather_api import WeatherData
 
@@ -24,13 +24,15 @@ class GeminiOutfitClient:
         self,
         api_key: str,
         *,
-        model: str = "gemini-3.5-flash",
+        model: str = "gemini-2.5-flash",
+        fallback_models: Iterable[str] = ("gemini-2.5-flash-lite",),
         client: Any | None = None,
         generation_config_factory: Any | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
             raise ValueError("api_key is required")
-        self.model = model
+        self.models = _model_attempts(model, fallback_models)
+        self.model = self.models[0]
         self.client = client or self._build_default_client(api_key)
         self.generation_config_factory = generation_config_factory or self._build_generation_config
 
@@ -38,14 +40,23 @@ class GeminiOutfitClient:
         """Build a prompt from weather data and return the AI recommendation."""
 
         prompt = self.build_prompt(weather)
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=self.generation_config_factory(self.SYSTEM_INSTRUCTION),
-            )
-        except Exception as exc:  # pragma: no cover - concrete SDK exceptions vary by version
-            raise AIClientError("Failed to get outfit recommendation from Gemini") from exc
+        last_error: Exception | None = None
+        for model in self.models:
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=self.generation_config_factory(self.SYSTEM_INSTRUCTION),
+                )
+                break
+            except Exception as exc:  # pragma: no cover - concrete SDK exceptions vary by version
+                last_error = exc
+        else:
+            detail = str(last_error).strip() if last_error else ""
+            message = "Failed to get outfit recommendation from Gemini"
+            if detail:
+                message = f"{message}: {detail}"
+            raise AIClientError(message) from last_error
 
         recommendation = getattr(response, "text", None)
 
@@ -82,3 +93,12 @@ class GeminiOutfitClient:
             system_instruction=system_instruction,
             temperature=0.7,
         )
+
+
+def _model_attempts(model: str, fallback_models: Iterable[str]) -> tuple[str, ...]:
+    models: list[str] = []
+    for candidate in (model, *fallback_models):
+        candidate = candidate.strip()
+        if candidate and candidate not in models:
+            models.append(candidate)
+    return tuple(models)

@@ -10,13 +10,20 @@ class FakeGeminiResponse:
 
 
 class FakeModels:
-    def __init__(self, content="Wear a coat.", exception=None):
+    def __init__(self, content="Wear a coat.", exception=None, exceptions=None):
         self.content = content
         self.exception = exception
+        self.exceptions = list(exceptions or [])
         self.last_kwargs = None
+        self.calls = []
 
     def generate_content(self, **kwargs):
         self.last_kwargs = kwargs
+        self.calls.append(kwargs)
+        if self.exceptions:
+            exception = self.exceptions.pop(0)
+            if exception:
+                raise exception
         if self.exception:
             raise self.exception
         return FakeGeminiResponse(self.content)
@@ -65,6 +72,24 @@ class GeminiOutfitClientTests(unittest.TestCase):
             models.last_kwargs["config"]["system_instruction"],
             GeminiOutfitClient.SYSTEM_INSTRUCTION,
         )
+
+    def test_generate_recommendation_tries_fallback_model_after_error(self):
+        models = FakeModels(
+            "Wear a rain jacket.",
+            exceptions=[RuntimeError("high demand"), None],
+        )
+        client = GeminiOutfitClient(
+            "gemini-key",
+            model="primary-model",
+            fallback_models=("fallback-model",),
+            client=FakeGeminiClient(models),
+            generation_config_factory=lambda instruction: {"system_instruction": instruction},
+        )
+
+        recommendation = client.generate_recommendation(self.weather)
+
+        self.assertEqual(recommendation, "Wear a rain jacket.")
+        self.assertEqual([call["model"] for call in models.calls], ["primary-model", "fallback-model"])
 
     def test_generate_recommendation_wraps_client_errors(self):
         models = FakeModels(exception=RuntimeError("api down"))

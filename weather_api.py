@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-import requests
-
 
 class WeatherApiError(RuntimeError):
     """Raised when weather data cannot be fetched or parsed."""
@@ -54,14 +52,14 @@ class WeatherApiClient:
         *,
         units: str = "metric",
         timeout_seconds: int = 10,
-        session: requests.Session | None = None,
+        session: Any | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
             raise ValueError("api_key is required")
         self.api_key = api_key
         self.units = units
         self.timeout_seconds = timeout_seconds
-        self.session = session or requests.Session()
+        self.session = session
 
     def get_current_weather(self, city: str) -> WeatherData:
         """Fetch and parse current weather for a city."""
@@ -70,8 +68,11 @@ class WeatherApiClient:
         if not city:
             raise WeatherApiError("City name cannot be empty")
 
+        requests = _requests()
+        session = self.session or requests.Session()
+
         try:
-            response = self.session.get(
+            response = session.get(
                 self.BASE_URL,
                 params={"q": city, "appid": self.api_key, "units": self.units},
                 timeout=self.timeout_seconds,
@@ -115,7 +116,7 @@ class WeatherApiClient:
             raise WeatherApiError("OpenWeatherMap response is missing required weather data") from exc
 
 
-def _api_error_message(response: requests.Response) -> str:
+def _api_error_message(response: Any) -> str:
     try:
         payload = response.json()
     except ValueError:
@@ -135,3 +136,11 @@ def _precipitation_amount(value: Any) -> float:
         return float(raw_amount)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _requests() -> Any:
+    try:
+        import requests
+    except ImportError as exc:  # pragma: no cover - exercised only without installed dependency
+        raise WeatherApiError("The requests package is required. Install dependencies from requirements.txt") from exc
+    return requests

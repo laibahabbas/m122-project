@@ -24,7 +24,14 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    city = input("Enter a city name: ").strip()
+    try:
+        city = input("Enter a city name: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print(file=sys.stderr)
+        logging.error("City input was cancelled")
+        print("Error: city name cannot be empty.", file=sys.stderr)
+        return 1
+
     if not city:
         logging.error("Empty city name entered")
         print("Error: city name cannot be empty.", file=sys.stderr)
@@ -36,7 +43,11 @@ def main() -> int:
             units=config.weather_units,
             timeout_seconds=config.request_timeout_seconds,
         ),
-        GeminiOutfitClient(config.gemini_api_key, model=config.gemini_model),
+        GeminiOutfitClient(
+            config.gemini_api_key,
+            model=config.gemini_model,
+            fallback_models=config.gemini_fallback_models,
+        ),
     )
 
     try:
